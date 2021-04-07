@@ -25,19 +25,15 @@ class _CallPageState extends State<CallPage> {
   final _users = <int>[];
 
   bool muted = false;
-  int _userNo = 0;
-  RtcEngine _engine;
-  AgoraRtmClient _client;
-  AgoraRtmChannel _channel;
-  bool _isInChannel = false;
-  bool _isLogin = false;
 
-  final _channelMessageController = TextEditingController();
+  RtcEngine _engine;
+
   @override
   void dispose() {
+    print('logout');
     _users.clear();
-    _logout();
-    _leaveChannel();
+    context.read<ChatProvider>().logout();
+    context.read<ChatProvider>().leaveChannel();
     _engine.leaveChannel();
     _engine.destroy();
     super.dispose();
@@ -47,122 +43,37 @@ class _CallPageState extends State<CallPage> {
   void initState() {
     super.initState();
     initialize();
-    _createClient();
-  }
-
-  void _logout() async {
-    try {
-      await _client.logout();
-      _log('Logout success.');
-    } catch (errorCode) {
-      _log('Logout error: ');
-    }
-  }
-
-  void _leaveChannel() async {
-    try {
-      await _channel.leave();
-      _log('Leave channel success.');
-      _client.releaseChannel(_channel.channelId);
-    } catch (errorCode) {
-      _log('Leave channel error: ' + errorCode.toString());
-    }
-  }
-
-  void _toggleSendChannelMessage() async {
-    String text = _channelMessageController.text;
-    if (text.isEmpty) {
-      _log('Please input text to send.');
-      return;
-    }
-    try {
-      await _channel.sendMessage(AgoraRtmMessage.fromText(text));
-      _log(text);
-    } catch (errorCode) {
-      _log('Send channel message error: ' + errorCode.toString());
-    }
-  }
-
-  void _log(String message) {
-    print(message);
-    context.read<ChatProvider>().insert(message);
-  }
-
-  void _createClient() async {
-    _client = await AgoraRtmClient.createInstance(APP_ID);
-    _client.onMessageReceived = (AgoraRtmMessage message, String peerId) {
-      _log("Peer msg: " + peerId + ", msg: " + message.text);
-    };
-    _client.onConnectionStateChanged = (int state, int reason) {
-      _log('Connection state changed: ' +
-          state.toString() +
-          ', reason: ' +
-          reason.toString());
-      if (state == 5) {
-        _client.logout();
-        _log('Logout.');
-        setState(() {});
-      }
-    };
-    await _client.login(null, widget.nameLogin);
-    _log('Login success: ' + widget.nameLogin);
-    setState(() {
-      _isLogin = true;
-    });
-
-    try {
-      _channel = await _createChannel(widget.channelName);
-      await _channel.join();
-      _log('Join channel success.');
-
-      setState(() {
-        _isInChannel = true;
-      });
-    } catch (e) {
-      print('Join channel error' + e);
-    }
-  }
-
-  Future<AgoraRtmChannel> _createChannel(String name) async {
-    AgoraRtmChannel channel = await _client.createChannel(name);
-    channel.onMemberJoined = (AgoraRtmMember member) {
-      _log(
-          "Member joined: " + member.userId + ', channel: ' + member.channelId);
-    };
-    channel.onMemberLeft = (AgoraRtmMember member) {
-      _log("Member left: " + member.userId + ', channel: ' + member.channelId);
-    };
-    channel.onMessageReceived =
-        (AgoraRtmMessage message, AgoraRtmMember member) {
-      _log("Channel msg: " + member.userId + ", msg: " + message.text);
-    };
-    return channel;
+    context
+        .read<ChatProvider>()
+        .createClient(widget.nameLogin, widget.channelName);
   }
 
   Widget _buildSendChannelMessage() {
-    if (!_isLogin || !_isInChannel) {
+    final chatProvider = context.watch<ChatProvider>();
+    if (!chatProvider.isLogin ||
+        !chatProvider.isInChannel) {
       return Container();
     }
     return Row(children: <Widget>[
       Expanded(
           child: TextField(
-              controller: _channelMessageController,
+              controller: chatProvider.channelMessageController,
               decoration: InputDecoration(hintText: 'Input channel message'))),
       OutlineButton(
         child: Text('Send to Channel'),
-        onPressed: _toggleSendChannelMessage,
+        onPressed: chatProvider.toggleSendChannelMessage,
       )
     ]);
   }
 
-  Future<void> initialize() async {
+  void initialize() async {
     if (APP_ID.isEmpty) {
       final chatProvider = context.read<ChatProvider>();
-      setState(() {
+     
         chatProvider
             .add('APP_ID missing, please provide your APP_ID in settings.dart');
         chatProvider.add('Agora Engine is not starting');
-      });
+      
       return;
     }
 
