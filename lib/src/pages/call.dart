@@ -29,7 +29,10 @@ class _CallPageState extends State<CallPage> {
   RtcEngine _engine;
   AgoraRtmClient _client;
   AgoraRtmChannel _channel;
+  bool _isInChannel = false;
+  bool _isLogin = false;
 
+  final _channelMessageController = TextEditingController();
   @override
   void dispose() {
     _users.clear();
@@ -48,84 +51,118 @@ class _CallPageState extends State<CallPage> {
   }
 
   void _logout() async {
-    final chatProvider = context.read<ChatProvider>();
     try {
       await _client.logout();
-      chatProvider.log('Logout success.');
+      _log('Logout success.');
     } catch (errorCode) {
-      chatProvider.log('Logout error: ');
+      _log('Logout error: ');
     }
   }
 
   void _leaveChannel() async {
-    final chatProvider = context.read<ChatProvider>();
     try {
       await _channel.leave();
-      chatProvider.log('Leave channel success.');
+      _log('Leave channel success.');
       _client.releaseChannel(_channel.channelId);
     } catch (errorCode) {
-      chatProvider.log('Leave channel error: ' + errorCode.toString());
+      _log('Leave channel error: ' + errorCode.toString());
     }
   }
 
+  void _toggleSendChannelMessage() async {
+    String text = _channelMessageController.text;
+    if (text.isEmpty) {
+      _log('Please input text to send.');
+      return;
+    }
+    try {
+      await _channel.sendMessage(AgoraRtmMessage.fromText(text));
+      _log(text);
+    } catch (errorCode) {
+      _log('Send channel message error: ' + errorCode.toString());
+    }
+  }
+
+  void _log(String message) {
+    print(message);
+    context.read<ChatProvider>().insert(message);
+  }
+
   void _createClient() async {
-    final chatProvider = context.read<ChatProvider>();
     _client = await AgoraRtmClient.createInstance(APP_ID);
     _client.onMessageReceived = (AgoraRtmMessage message, String peerId) {
-      chatProvider.log("Peer msg: " + peerId + ", msg: " + message.text);
+      _log("Peer msg: " + peerId + ", msg: " + message.text);
     };
     _client.onConnectionStateChanged = (int state, int reason) {
-      chatProvider.log('Connection state changed: ' +
+      _log('Connection state changed: ' +
           state.toString() +
           ', reason: ' +
           reason.toString());
       if (state == 5) {
         _client.logout();
-        chatProvider.log('Logout.');
+        _log('Logout.');
+        setState(() {});
       }
     };
     await _client.login(null, widget.nameLogin);
-    chatProvider.log('Login success: ' + widget.nameLogin);
-    chatProvider.login = true;
+    _log('Login success: ' + widget.nameLogin);
+    setState(() {
+      _isLogin = true;
+    });
 
     try {
       _channel = await _createChannel(widget.channelName);
       await _channel.join();
-      chatProvider.log('Join channel success.');
+      _log('Join channel success.');
 
-      chatProvider.inChannel = true;
+      setState(() {
+        _isInChannel = true;
+      });
     } catch (e) {
       print('Join channel error' + e);
     }
   }
 
   Future<AgoraRtmChannel> _createChannel(String name) async {
-    final chatProvider = context.read<ChatProvider>();
     AgoraRtmChannel channel = await _client.createChannel(name);
     channel.onMemberJoined = (AgoraRtmMember member) {
-      chatProvider.log(
+      _log(
           "Member joined: " + member.userId + ', channel: ' + member.channelId);
     };
     channel.onMemberLeft = (AgoraRtmMember member) {
-      chatProvider.log(
-          "Member left: " + member.userId + ', channel: ' + member.channelId);
+      _log("Member left: " + member.userId + ', channel: ' + member.channelId);
     };
     channel.onMessageReceived =
         (AgoraRtmMessage message, AgoraRtmMember member) {
-      chatProvider
-          .log("Channel msg: " + member.userId + ", msg: " + message.text);
+      _log("Channel msg: " + member.userId + ", msg: " + message.text);
     };
     return channel;
+  }
+
+  Widget _buildSendChannelMessage() {
+    if (!_isLogin || !_isInChannel) {
+      return Container();
+    }
+    return Row(children: <Widget>[
+      Expanded(
+          child: TextField(
+              controller: _channelMessageController,
+              decoration: InputDecoration(hintText: 'Input channel message'))),
+      OutlineButton(
+        child: Text('Send to Channel'),
+        onPressed: _toggleSendChannelMessage,
+      )
+    ]);
   }
 
   Future<void> initialize() async {
     if (APP_ID.isEmpty) {
       final chatProvider = context.read<ChatProvider>();
-
-      chatProvider
-          .add('APP_ID missing, please provide your APP_ID in settings.dart');
-      chatProvider.add('Agora Engine is not starting');
-
+      setState(() {
+        chatProvider
+            .add('APP_ID missing, please provide your APP_ID in settings.dart');
+        chatProvider.add('Agora Engine is not starting');
+      });
       return;
     }
 
@@ -179,6 +216,69 @@ class _CallPageState extends State<CallPage> {
         },
       ),
     );
+  }
+
+  /// Helper function to get list of native views
+  List<Widget> _getRenderViews() {
+    final List<StatefulWidget> list = [];
+    if (widget.role == ClientRole.Broadcaster) {
+      list.add(RtcLocalView.SurfaceView());
+    }
+    _users.forEach((int uid) => list.add(RtcRemoteView.SurfaceView(uid: uid)));
+    return list;
+  }
+
+  /// Video view wrapper
+  Widget _videoView(view) {
+    return Expanded(child: Container(child: view));
+  }
+
+  /// Video view row wrapper
+  Widget _expandedVideoRow(List<Widget> views) {
+    final wrappedViews = views.map<Widget>(_videoView).toList();
+    return Expanded(
+      child: Row(
+        children: wrappedViews,
+      ),
+    );
+  }
+
+  /// Video layout wrapper
+  Widget _viewRows() {
+    final views = _getRenderViews();
+    switch (views.length) {
+      case 1:
+        return Container(
+            child: Column(
+          children: <Widget>[_videoView(views[0])],
+        ));
+      case 2:
+        return Container(
+            child: Column(
+          children: <Widget>[
+            _expandedVideoRow([views[0]]),
+            _expandedVideoRow([views[1]])
+          ],
+        ));
+      case 3:
+        return Container(
+            child: Column(
+          children: <Widget>[
+            _expandedVideoRow(views.sublist(0, 2)),
+            _expandedVideoRow(views.sublist(2, 3)),
+          ],
+        ));
+      case 4:
+        return Container(
+            child: Column(
+          children: <Widget>[
+            _expandedVideoRow(views.sublist(0, 2)),
+            _expandedVideoRow(views.sublist(2, 4)),
+          ],
+        ));
+      default:
+    }
+    return Container();
   }
 
   /// Toolbar layout
@@ -258,140 +358,25 @@ class _CallPageState extends State<CallPage> {
               Expanded(
                 child: Stack(
                   children: <Widget>[
-                    _ViewRows(
-                      role: widget.role,
-                      users: _users,
-                    ),
+                    _viewRows(),
                     _ChatLayout(),
                     _toolbar(),
                   ],
                 ),
               ),
-              InputMessage(channel: _channel,),
+              Container(
+                color: Colors.white,
+                child: Column(
+                  children: [
+                    _buildSendChannelMessage(),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
-  }
-}
-
-class InputMessage extends StatelessWidget {
-  const InputMessage({
-    Key key, this.channel,
-  }) : super(key: key);
-  final AgoraRtmChannel channel;
-  @override
-  Widget build(BuildContext context) {
-    final chatProvider = context.watch<ChatProvider>();
-
-    return Container(
-      color: Colors.white,
-      child: Column(
-        children: [
-          (!chatProvider.isLogin || !chatProvider.isInChannel)
-              ? Container()
-              : Row(children: <Widget>[
-                  Expanded(
-                      child: TextField(
-                          controller: chatProvider.channelMessageController,
-                          decoration: InputDecoration(
-                              hintText: 'Input channel message'))),
-                  OutlineButton(
-                    child: Text('Send to Channel'),
-                    onPressed: () => _toggleSendChannelMessage(context,channel),
-                  )
-                ])
-        ],
-      ),
-    );
-  }
-
-  void _toggleSendChannelMessage(BuildContext context,AgoraRtmChannel channel) async {
-    final chatProvider = context.read<ChatProvider>();
-    String text = chatProvider.channelMessageController.text;
-    if (text.isEmpty) {
-      chatProvider.log('Please input text to send.');
-      return;
-    }
-    try {
-      await channel.sendMessage(AgoraRtmMessage.fromText(text));
-      chatProvider.log(text);
-    } catch (errorCode) {
-      chatProvider.log('Send channel message error: ' + errorCode.toString());
-    }
-  }
-}
-
-class _ViewRows extends StatelessWidget {
-  const _ViewRows({
-    Key key,
-    this.users,
-    this.role,
-  }) : super(key: key);
-  final List<int> users;
-  final ClientRole role;
-  @override
-  Widget build(BuildContext context) {
-    final views = _getRenderViews();
-    switch (views.length) {
-      case 1:
-        return Container(
-            child: Column(
-          children: <Widget>[_videoView(views[0])],
-        ));
-      case 2:
-        return Container(
-            child: Column(
-          children: <Widget>[
-            _expandedVideoRow([views[0]]),
-            _expandedVideoRow([views[1]])
-          ],
-        ));
-      case 3:
-        return Container(
-            child: Column(
-          children: <Widget>[
-            _expandedVideoRow(views.sublist(0, 2)),
-            _expandedVideoRow(views.sublist(2, 3)),
-          ],
-        ));
-      case 4:
-        return Container(
-            child: Column(
-          children: <Widget>[
-            _expandedVideoRow(views.sublist(0, 2)),
-            _expandedVideoRow(views.sublist(2, 4)),
-          ],
-        ));
-      default:
-    }
-    return Container();
-  }
-
-  /// Video view row wrapper
-  Widget _expandedVideoRow(List<Widget> views) {
-    final wrappedViews = views.map<Widget>(_videoView).toList();
-    return Expanded(
-      child: Row(
-        children: wrappedViews,
-      ),
-    );
-  }
-
-  /// Helper function to get list of native views
-  List<Widget> _getRenderViews() {
-    final List<StatefulWidget> list = [];
-    if (role == ClientRole.Broadcaster) {
-      list.add(RtcLocalView.SurfaceView());
-    }
-    users.forEach((int uid) => list.add(RtcRemoteView.SurfaceView(uid: uid)));
-    return list;
-  }
-
-  /// Video view wrapper
-  Widget _videoView(view) {
-    return Expanded(child: Container(child: view));
   }
 }
 

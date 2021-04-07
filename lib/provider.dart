@@ -1,3 +1,4 @@
+import 'package:agora_rtm/agora_rtm.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
@@ -6,6 +7,17 @@ class ChatProvider extends ChangeNotifier {
   bool _isInChannel = false;
   bool _isLogin = false;
   TextEditingController _channelMessageController = TextEditingController();
+  AgoraRtmClient _client;
+  AgoraRtmChannel _channel;
+
+  set client(v) {
+    _client = v;
+     notifyListeners();
+  }
+
+  get client => _client;
+
+  get channel => _channel;
   void insert(String message) {
     _chat.insert(0, message);
     notifyListeners();
@@ -39,3 +51,4 @@ class ChatProvider extends ChangeNotifier {
 
   get channelMessageController => _channelMessageController;
 }
+
