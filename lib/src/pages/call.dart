@@ -48,32 +48,14 @@ class _CallPageState extends State<CallPage> {
         .createClient(widget.nameLogin, widget.channelName);
   }
 
-  Widget _buildSendChannelMessage() {
-    final chatProvider = context.watch<ChatProvider>();
-    if (!chatProvider.isLogin ||
-        !chatProvider.isInChannel) {
-      return Container();
-    }
-    return Row(children: <Widget>[
-      Expanded(
-          child: TextField(
-              controller: chatProvider.channelMessageController,
-              decoration: InputDecoration(hintText: 'Input channel message'))),
-      OutlineButton(
-        child: Text('Send to Channel'),
-        onPressed: chatProvider.toggleSendChannelMessage,
-      )
-    ]);
-  }
-
   void initialize() async {
     if (APP_ID.isEmpty) {
       final chatProvider = context.read<ChatProvider>();
-     
-        chatProvider
-            .add('APP_ID missing, please provide your APP_ID in settings.dart');
-        chatProvider.add('Agora Engine is not starting');
-      
+
+      chatProvider
+          .add('APP_ID missing, please provide your APP_ID in settings.dart');
+      chatProvider.add('Agora Engine is not starting');
+
       return;
     }
 
@@ -262,6 +244,7 @@ class _CallPageState extends State<CallPage> {
     print('start build');
     return SafeArea(
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         backgroundColor: Colors.black,
         body: Center(
           child: Column(
@@ -269,6 +252,7 @@ class _CallPageState extends State<CallPage> {
               Expanded(
                 child: Stack(
                   children: <Widget>[
+                    
                     _viewRows(),
                     _ChatLayout(),
                     _toolbar(),
@@ -279,7 +263,7 @@ class _CallPageState extends State<CallPage> {
                 color: Colors.white,
                 child: Column(
                   children: [
-                    _buildSendChannelMessage(),
+                    SendChannelMessage(context: context),
                   ],
                 ),
               ),
@@ -288,6 +272,34 @@ class _CallPageState extends State<CallPage> {
         ),
       ),
     );
+  }
+}
+
+class SendChannelMessage extends StatelessWidget {
+  const SendChannelMessage({
+    Key key,
+    @required this.context,
+  }) : super(key: key);
+
+  final BuildContext context;
+
+  @override
+  Widget build(BuildContext context) {
+    print('start build 2');
+    final chatProvider = context.watch<ChatProvider>();
+    if (!chatProvider.isLogin || !chatProvider.isInChannel) {
+      return Container();
+    }
+    return Row(children: <Widget>[
+      Expanded(
+          child: TextField(
+              controller: chatProvider.channelMessageController,
+              decoration: InputDecoration(hintText: 'Input channel message'))),
+      OutlineButton(
+        child: Text('Send to Channel'),
+        onPressed: chatProvider.toggleSendChannelMessage,
+      )
+    ]);
   }
 }
 
@@ -303,7 +315,7 @@ class _ChatLayout extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 48),
       alignment: Alignment.bottomCenter,
       child: FractionallySizedBox(
-        heightFactor: 0.5,
+        heightFactor: 0.7,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 48),
           child: ListView.builder(

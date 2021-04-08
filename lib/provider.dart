@@ -67,6 +67,7 @@ class ChatProvider extends ChangeNotifier {
     } catch (errorCode) {
       log('Send channel message error: ' + errorCode.toString());
     }
+    channelMessageController.text = '';
   }
 
   void createClient(String nameLogin, String channelName) async {
@@ -106,8 +107,7 @@ class ChatProvider extends ChangeNotifier {
   Future<AgoraRtmChannel> _createChannel(String name) async {
     AgoraRtmChannel channel = await _client.createChannel(name);
     channel.onMemberJoined = (AgoraRtmMember member) {
-      log(
-          "Member joined: " + member.userId + ', channel: ' + member.channelId);
+      log("Member joined: " + member.userId + ', channel: ' + member.channelId);
     };
     channel.onMemberLeft = (AgoraRtmMember member) {
       log("Member left: " + member.userId + ', channel: ' + member.channelId);
