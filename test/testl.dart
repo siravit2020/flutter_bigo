@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:agora_rtm/agora_rtm.dart';
-import 'package:flutter_bigo/src/utils/settings.dart';
+import 'package:flutter_bigo/utils/settings.dart';
 
 void main() => runApp(MyApp());
 

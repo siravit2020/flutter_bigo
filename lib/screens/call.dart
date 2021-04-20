@@ -6,118 +6,50 @@ import 'package:agora_rtc_engine/rtc_remote_view.dart' as RtcRemoteView;
 import 'package:agora_rtm/agora_rtm.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bigo/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import '../utils/settings.dart';
 
 class CallPage extends StatefulWidget {
   /// non-modifiable channel name of the page
-  final String channelName;
-  final String nameLogin;
-  final ClientRole role;
-  const CallPage({Key key, this.channelName, this.role, this.nameLogin})
-      : super(key: key);
+
+  const CallPage({
+    Key key,
+  }) : super(key: key);
 
   @override
   _CallPageState createState() => _CallPageState();
 }
 
 class _CallPageState extends State<CallPage> {
-  final _users = <int>[];
-
-  bool muted = false;
-
-  RtcEngine _engine;
-
   @override
   void dispose() {
     print('logout');
-    _users.clear();
-    context.read<ChatProvider>().logout();
-    context.read<ChatProvider>().leaveChannel();
-    _engine.leaveChannel();
-    _engine.destroy();
+    final provider = context.read<LiveStreamProvider>();
+    provider.users.clear();
+    provider.logout();
+    provider.leaveChannel();
+    provider.engine.leaveChannel();
+    provider.engine.destroy();
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
-    initialize();
-    context
-        .read<ChatProvider>()
-        .createClient(widget.nameLogin, widget.channelName);
+    final provider = context.read<LiveStreamProvider>();
+    provider
+      ..initialize()
+      ..createClient();
   }
 
-  void initialize() async {
-    if (APP_ID.isEmpty) {
-      final chatProvider = context.read<ChatProvider>();
-
-      chatProvider
-          .add('APP_ID missing, please provide your APP_ID in settings.dart');
-      chatProvider.add('Agora Engine is not starting');
-
-      return;
-    }
-
-    await _initAgoraRtcEngine();
-    _addAgoraEventHandlers();
-
-    VideoEncoderConfiguration configuration = VideoEncoderConfiguration();
-    configuration.dimensions = VideoDimensions(1920, 1080);
-    await _engine.setVideoEncoderConfiguration(configuration);
-    await _engine.joinChannel(null, widget.channelName, null, 0);
-  }
-
-  /// Create agora sdk instance and initialize
-  Future<void> _initAgoraRtcEngine() async {
-    _engine = await RtcEngine.createWithConfig(RtcEngineConfig(APP_ID));
-    await _engine.enableVideo();
-    await _engine.setChannelProfile(ChannelProfile.LiveBroadcasting);
-    await _engine.setClientRole(widget.role);
-  }
-
-  /// Add agora event handlers
-  void _addAgoraEventHandlers() {
-    final chatProvider = context.read<ChatProvider>();
-    _engine.setEventHandler(
-      RtcEngineEventHandler(
-        error: (code) {
-          final info = 'onError: $code';
-          chatProvider.add(info);
-        },
-        joinChannelSuccess: (channel, uid, elapsed) {
-          final info = 'onJoinChannel: $channel, uid: $uid';
-          chatProvider.add(info);
-        },
-        leaveChannel: (stats) {
-          chatProvider.add('onLeaveChannel');
-          _users.clear();
-        },
-        userJoined: (uid, elapsed) {
-          final info = 'userJoined: $uid';
-          chatProvider.add(info);
-          _users.add(uid);
-        },
-        userOffline: (uid, elapsed) {
-          final info = 'userOffline: $uid';
-          chatProvider.add(info);
-          _users.remove(uid);
-        },
-        firstRemoteVideoFrame: (uid, width, height, elapsed) {
-          final info = 'firstRemoteVideo: $uid ${width}x $height';
-          chatProvider.add(info);
-        },
-      ),
-    );
-  }
-
-  /// Helper function to get list of native views
   List<Widget> _getRenderViews() {
+    final provider = context.read<LiveStreamProvider>();
     final List<StatefulWidget> list = [];
-    if (widget.role == ClientRole.Broadcaster) {
+    if (provider.role == ClientRole.Broadcaster) {
       list.add(RtcLocalView.SurfaceView());
     }
-    _users.forEach((int uid) => list.add(RtcRemoteView.SurfaceView(uid: uid)));
+    provider.users
+        .forEach((int uid) => list.add(RtcRemoteView.SurfaceView(uid: uid)));
     return list;
   }
 
@@ -176,7 +108,8 @@ class _CallPageState extends State<CallPage> {
 
   /// Toolbar layout
   Widget _toolbar() {
-    if (widget.role == ClientRole.Audience) return Container();
+    final provider = context.read<LiveStreamProvider>();
+    if (provider.role == ClientRole.Audience) return Container();
     return Container(
       alignment: Alignment.bottomCenter,
       padding: const EdgeInsets.symmetric(vertical: 48),
@@ -184,15 +117,15 @@ class _CallPageState extends State<CallPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           RawMaterialButton(
-            onPressed: _onToggleMute,
+            onPressed: provider.onToggleMute,
             child: Icon(
-              muted ? Icons.mic_off : Icons.mic,
-              color: muted ? Colors.white : Colors.blueAccent,
+              provider.muted ? Icons.mic_off : Icons.mic,
+              color: provider.muted ? Colors.white : Colors.blueAccent,
               size: 20.0,
             ),
             shape: CircleBorder(),
             elevation: 2.0,
-            fillColor: muted ? Colors.blueAccent : Colors.white,
+            fillColor: provider.muted ? Colors.blueAccent : Colors.white,
             padding: const EdgeInsets.all(12.0),
           ),
           RawMaterialButton(
@@ -208,7 +141,7 @@ class _CallPageState extends State<CallPage> {
             padding: const EdgeInsets.all(15.0),
           ),
           RawMaterialButton(
-            onPressed: _onSwitchCamera,
+            onPressed: provider.onSwitchCamera,
             child: Icon(
               Icons.switch_camera,
               color: Colors.blueAccent,
@@ -224,19 +157,14 @@ class _CallPageState extends State<CallPage> {
     );
   }
 
-  void _onCallEnd(BuildContext context) {
-    Navigator.pop(context);
-  }
-
-  void _onToggleMute() {
-    setState(() {
-      muted = !muted;
-    });
-    _engine.muteLocalAudioStream(muted);
-  }
-
-  void _onSwitchCamera() {
-    _engine.switchCamera();
+  void _onCallEnd(BuildContext context) async {
+    final provider = context.read<LiveStreamProvider>();
+    await provider.users.clear();
+    provider.logout();
+    provider.leaveChannel();
+    await provider.engine.leaveChannel();
+    await provider.engine.destroy();
+    //Navigator.pop(context);
   }
 
   @override
@@ -244,7 +172,7 @@ class _CallPageState extends State<CallPage> {
     print('start build');
     return SafeArea(
       child: Scaffold(
-        resizeToAvoidBottomInset: false,
+        // resizeToAvoidBottomInset: false,
         backgroundColor: Colors.black,
         body: Center(
           child: Column(
@@ -252,18 +180,24 @@ class _CallPageState extends State<CallPage> {
               Expanded(
                 child: Stack(
                   children: <Widget>[
-                    
                     _viewRows(),
                     _ChatLayout(),
                     _toolbar(),
-                  ],
-                ),
-              ),
-              Container(
-                color: Colors.white,
-                child: Column(
-                  children: [
-                    SendChannelMessage(context: context),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      left: 0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          vertical: 4.0,
+                          horizontal: 8.0,
+                        ),
+                        child: SendChannelMessage(context: context),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -286,20 +220,35 @@ class SendChannelMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     print('start build 2');
-    final chatProvider = context.watch<ChatProvider>();
+    final chatProvider = context.watch<LiveStreamProvider>();
     if (!chatProvider.isLogin || !chatProvider.isInChannel) {
       return Container();
     }
-    return Row(children: <Widget>[
-      Expanded(
+    return Row(
+      children: <Widget>[
+        Expanded(
           child: TextField(
-              controller: chatProvider.channelMessageController,
-              decoration: InputDecoration(hintText: 'Input channel message'))),
-      OutlineButton(
-        child: Text('Send to Channel'),
-        onPressed: chatProvider.toggleSendChannelMessage,
-      )
-    ]);
+            controller: chatProvider.channelMessageController,
+            style: TextStyle(color: Colors.white),
+            cursorColor: Colors.white,
+            decoration: InputDecoration(
+              hintText: 'message',
+              hintStyle: TextStyle(color: Colors.white38),
+              border: InputBorder.none,
+            ),
+          ),
+        ),
+        GestureDetector(
+          onTap: chatProvider.toggleSendChannelMessage,
+          child: SvgPicture.asset(
+            'assets/icons/send.svg',
+            width: 24,
+            color: Colors.white,
+            
+          ),
+        )
+      ],
+    );
   }
 }
 
@@ -310,7 +259,7 @@ class _ChatLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final chatProvider = context.watch<ChatProvider>();
+    final chatProvider = context.watch<LiveStreamProvider>();
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 48),
       alignment: Alignment.bottomCenter,
