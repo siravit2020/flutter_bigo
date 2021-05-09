@@ -92,41 +92,14 @@ class IndexState extends State<IndexPage> {
                       SizedBox(
                         height: 30,
                       ),
-                      TextField(
-                        controller: _channelController,
-                        cursorColor: Colors.black87,
-                        decoration: InputDecoration(
-                          focusedBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.black87),
-                          ),
-                          errorText: _validateError
-                              ? 'Channel name is mandatory'
-                              : null,
-                          border: UnderlineInputBorder(
-                            borderSide: BorderSide(width: 0.5),
-                          ),
-                          hintText: 'Channel name',
-                        ),
+                      _FieldName(
+                        channelController: _channelController,
+                        validateError: _validateError,
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: FlatButton(
-                                onPressed: onJoin,
-                                child: Text(
-                                  'Join',
-                                  style: TextStyle(fontSize: 20.sp),
-                                ),
-                                color: Colors.white,
-                                textColor: Colors.black,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30.0)),
-                              ),
-                            )
-                          ],
-                        ),
+                      _JoinButton(
+                        function: () {
+                          onJoin();
+                        },
                       )
                     ],
                   ),
@@ -139,7 +112,7 @@ class IndexState extends State<IndexPage> {
     );
   }
 
-  Future<void> onJoin() async {
+  void onJoin() async {
     // update input validation
     setState(() {
       _channelController.text.isEmpty
@@ -168,5 +141,68 @@ class IndexState extends State<IndexPage> {
   Future<void> _handleCameraAndMic(Permission permission) async {
     final status = await permission.request();
     print(status);
+  }
+}
+
+class _FieldName extends StatelessWidget {
+  const _FieldName({
+    Key key,
+    @required TextEditingController channelController,
+    @required bool validateError,
+  })  : _channelController = channelController,
+        _validateError = validateError,
+        super(key: key);
+
+  final TextEditingController _channelController;
+  final bool _validateError;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _channelController,
+      cursorColor: Colors.black87,
+      decoration: InputDecoration(
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: Colors.black87),
+        ),
+        errorText: _validateError ? 'Channel name is mandatory' : null,
+        border: UnderlineInputBorder(
+          borderSide: BorderSide(width: 0.5),
+        ),
+        hintText: 'Channel name',
+      ),
+    );
+  }
+}
+
+class _JoinButton extends StatelessWidget {
+  const _JoinButton({
+    Key key,
+    this.function,
+  }) : super(key: key);
+  final Function function;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: FlatButton(
+              onPressed: function,
+              child: Text(
+                'Join',
+                style: TextStyle(fontSize: 20.sp),
+              ),
+              color: Colors.white,
+              textColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30.0),
+              ),
+            ),
+          )
+        ],
+      ),
+    );
   }
 }

@@ -110,50 +110,64 @@ class _CallPageState extends State<CallPage> {
   Widget _toolbar() {
     final provider = context.read<LiveStreamProvider>();
     if (provider.role == ClientRole.Audience) return Container();
-    return Container(
-      alignment: Alignment.bottomCenter,
-      padding: const EdgeInsets.symmetric(vertical: 48),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          RawMaterialButton(
-            onPressed: provider.onToggleMute,
-            child: Icon(
-              provider.muted ? Icons.mic_off : Icons.mic,
-              color: provider.muted ? Colors.white : Colors.blueAccent,
-              size: 20.0,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        ClipOval(
+          child: Material(
+            color: Colors.black54,
+            child: InkWell(
+              child: SizedBox(
+                height: 30,
+                width: 30,
+                child: Icon(
+                  provider.muted ? Icons.mic_off : Icons.mic,
+                  color: Colors.white,
+                  size: 16.0,
+                ),
+              ),
+              onTap: provider.onToggleMute,
             ),
-            shape: CircleBorder(),
-            elevation: 2.0,
-            fillColor: provider.muted ? Colors.blueAccent : Colors.white,
-            padding: const EdgeInsets.all(12.0),
           ),
-          RawMaterialButton(
-            onPressed: () => _onCallEnd(context),
-            child: Icon(
-              Icons.call_end,
-              color: Colors.white,
-              size: 35.0,
+        ),
+        SizedBox(width: 10),
+        ClipOval(
+          child: Material(
+            color: Colors.black54,
+            child: InkWell(
+              child: SizedBox(
+                height: 30,
+                width: 30,
+                child: Icon(
+                  Icons.switch_camera,
+                  color: Colors.white,
+                  size: 16.0,
+                ),
+              ),
+              onTap: provider.onSwitchCamera,
             ),
-            shape: CircleBorder(),
-            elevation: 2.0,
-            fillColor: Colors.redAccent,
-            padding: const EdgeInsets.all(15.0),
           ),
-          RawMaterialButton(
-            onPressed: provider.onSwitchCamera,
-            child: Icon(
-              Icons.switch_camera,
-              color: Colors.blueAccent,
-              size: 20.0,
+        ),
+        SizedBox(width: 10),
+        ClipOval(
+          child: Material(
+            color: Colors.red,
+            child: InkWell(
+              child: SizedBox(
+                height: 30,
+                width: 30,
+                child: Icon(
+                  Icons.call_end,
+                  color: Colors.white,
+                  size: 16.0,
+                ),
+              ),
+              onTap: () => _onCallEnd(context),
             ),
-            shape: CircleBorder(),
-            elevation: 2.0,
-            fillColor: Colors.white,
-            padding: const EdgeInsets.all(12.0),
-          )
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -182,7 +196,6 @@ class _CallPageState extends State<CallPage> {
                   children: <Widget>[
                     _viewRows(),
                     _ChatLayout(),
-                    _toolbar(),
                     Positioned(
                       bottom: 0,
                       right: 0,
@@ -198,6 +211,11 @@ class _CallPageState extends State<CallPage> {
                         child: SendChannelMessage(context: context),
                       ),
                     ),
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: _toolbar(),
+                    )
                   ],
                 ),
               ),
@@ -244,7 +262,6 @@ class SendChannelMessage extends StatelessWidget {
             'assets/icons/send.svg',
             width: 24,
             color: Colors.white,
-            
           ),
         )
       ],

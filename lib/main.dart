@@ -12,27 +12,22 @@ void main() {
 }
 
 class App extends StatelessWidget {
-  // Create the initialization Future outside of `build`:
   final Future<FirebaseApp> _initialization = Firebase.initializeApp();
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-      // Initialize FlutterFire:
       future: _initialization,
       builder: (context, snapshot) {
-        // Check for errors
         if (snapshot.hasError) {
           print('error');
           return SizedBox();
         }
 
-        // Once complete, show your application
         if (snapshot.connectionState == ConnectionState.done) {
           return MyApp();
         }
 
-        // Otherwise, show something whilst waiting for initialization to complete
         return SizedBox();
       },
     );
@@ -48,7 +43,9 @@ class MyApp extends StatelessWidget {
       allowFontScaling: false,
       builder: () => MultiProvider(
         providers: [
-          ChangeNotifierProvider<LiveStreamProvider>(create: (_) => LiveStreamProvider()),
+          ChangeNotifierProvider<LiveStreamProvider>(
+            create: (_) => LiveStreamProvider(),
+          ),
         ],
         child: MaterialApp(
           debugShowCheckedModeBanner: false,

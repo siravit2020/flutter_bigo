@@ -32,29 +32,40 @@ class LoginScreen extends StatelessWidget {
               SizedBox(
                 height: 30,
               ),
-              RaisedButton(
-                padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30.0),
-                ),
-                color: Colors.white,
-                onPressed: () async {
-                  var result = await loginWithGoogle();
-                  if (result != null) {
-                    context.read<LiveStreamProvider>().uid = result.user.uid;
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => IndexPage()),
-                    );
-                  }
-                },
-                child: Text('Login with Google'),
-              )
+              _ButtonLogin()
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ButtonLogin extends StatelessWidget {
+  const _ButtonLogin({
+    Key key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return RaisedButton(
+      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(30.0),
+      ),
+      color: Colors.white,
+      onPressed: () async {
+        var result = await loginWithGoogle();
+        if (result != null) {
+          context.read<LiveStreamProvider>().uid = result.user.uid;
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => IndexPage()),
+          );
+        }
+      },
+      child: Text('Login with Google'),
     );
   }
 }
